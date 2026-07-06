@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Node (ha később build-eszközt adnál hozzá)
+node_modules/
+dist/
+
+# Lokális teszt
+*.local

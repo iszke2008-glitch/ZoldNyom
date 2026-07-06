@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>ZöldNyom</title>
+<meta name="description" content="Fotózd le, vedd fel, dobd szemetesbe — gyűjts pontokat minden felszedett szemétért.">
+<meta name="theme-color" content="#1F4A34">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ZöldNyom">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <div class="install-banner" id="install-banner">
+    <div class="txt"><b>Telepítsd a ZöldNyomot</b>Tedd ki a kezdőképernyődre, hogy egy koppintással elérd.</div>
+    <button onclick="installApp()">Telepítés</button>
+    <button class="dismiss" onclick="dismissInstall()" aria-label="Bezárás">✕</button>
+  </div>
+
+  <!-- ============ HOME ============ -->
+  <div class="page active" id="page-home">
+    <div class="home-header">
+      <div class="greeting">
+        <div class="eyebrow">Szia,</div>
+        <h2 id="home-name">Te 🌿</h2>
+      </div>
+      <div class="avatar">🌱</div>
+    </div>
+
+    <div class="grow-card">
+      <div class="top-row">
+        <div>
+          <div class="lvl-label">Jelenlegi szint</div>
+          <div class="lvl-name" id="lvl-name">Mag</div>
+        </div>
+        <div class="pts"><span id="pts-display">0</span><span>pontod</span></div>
+      </div>
+      <div class="plant-wrap">
+        <svg id="plant-svg" width="150" height="86" viewBox="0 0 150 86" fill="none">
+          <path d="M75 86 L75 40" stroke="#CFE0BC" stroke-width="4" stroke-linecap="round"/>
+          <path id="leaf-l1" d="M75 60 C 55 55, 45 40, 50 25" stroke="#E3982E" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <path id="leaf-r1" d="M75 50 C 95 45, 105 32, 100 18" stroke="#E3982E" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.35"/>
+          <path id="leaf-l2" d="M75 40 C 58 33, 52 18, 60 6" stroke="#E3982E" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.15"/>
+          <circle cx="75" cy="84" r="6" fill="#E3982E"/>
+        </svg>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%;"></div></div>
+      <div class="progress-note" id="progress-note">Kezdd el a gyűjtést, hogy fejlődj!</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-pod"><div class="num" id="stat-count">0</div><div class="lbl">gyűjtött szemét</div></div>
+      <div class="stat-pod"><div class="num" id="stat-streak">0</div><div class="lbl">napos sorozat</div></div>
+      <div class="stat-pod"><div class="num">🌍</div><div class="lbl">helyi hatás</div></div>
+    </div>
+
+    <button class="cta-scan" onclick="goScan()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 012-2h1.5l1-2h7l1 2H18a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V8z" stroke="#1C2620" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.4" stroke="#1C2620" stroke-width="1.8"/></svg>
+      Szemetet találtam
+    </button>
+
+    <div class="section-lbl">Legutóbbi jelentéseid</div>
+    <div id="recent-list"></div>
+  </div>
+
+  <!-- ============ SCAN STEP 1: PHOTO ============ -->
+  <div class="page" id="page-scan1">
+    <div class="scan-head">
+      <button class="back-btn" onclick="goHome()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#1C2620" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h3>Új jelentés</h3>
+    </div>
+    <div class="steps-track"><div class="seg done"></div><div class="seg"></div><div class="seg"></div></div>
+
+    <div class="step-copy">
+      <h2>1. Fotózd le a szemetet</h2>
+      <p>Készíts egy tiszta képet ott, ahol találtad — ez lesz a bizonyíték.</p>
+    </div>
+
+    <div class="cam-frame" id="cam-frame">
+      <div class="cam-placeholder" id="cam-placeholder">📷<br>Kamera indítása…</div>
+      <div class="cam-corner cc-tl"></div><div class="cam-corner cc-tr"></div>
+      <div class="cam-corner cc-bl"></div><div class="cam-corner cc-br"></div>
+    </div>
+
+    <button class="primary-btn" onclick="capturePhoto()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg>
+      Fotó készítése
+    </button>
+    <button class="ghost-btn" onclick="enableCamera()">Kamera újraindítása</button>
+  </div>
+
+  <!-- ============ SCAN STEP 2: PICKUP ============ -->
+  <div class="page" id="page-scan2">
+    <div class="scan-head">
+      <button class="back-btn" onclick="showPage('page-scan1')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#1C2620" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h3>Új jelentés</h3>
+    </div>
+    <div class="steps-track"><div class="seg done"></div><div class="seg done"></div><div class="seg"></div></div>
+
+    <div class="step-copy">
+      <h2>2. Vedd fel a szemetet</h2>
+      <p>A fotó megvan — most vedd fel, és indulj a legközelebbi szemeteshez.</p>
+    </div>
+
+    <div class="cam-frame" id="scan2-preview" style="aspect-ratio:1/1;"></div>
+
+    <button class="primary-btn" onclick="showPage('page-scan3'); startGPS();">Felvettem, tovább</button>
+    <button class="ghost-btn" onclick="showPage('page-scan1')">Mégsem</button>
+  </div>
+
+  <!-- ============ SCAN STEP 3: GPS ============ -->
+  <div class="page" id="page-scan3">
+    <div class="scan-head">
+      <button class="back-btn" onclick="showPage('page-scan2')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#1C2620" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h3>Új jelentés</h3>
+    </div>
+    <div class="steps-track"><div class="seg done"></div><div class="seg done"></div><div class="seg done"></div></div>
+
+    <div class="step-copy">
+      <h2>3. Dobd a szemetesbe</h2>
+      <p>Állj a szemetes mellé — a helymeghatározás igazolja, hogy tényleg ott jártál.</p>
+    </div>
+
+    <div class="gps-card">
+      <div class="gps-pulse">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-7.5 7-12a7 7 0 10-14 0c0 4.5 7 12 7 12z" stroke="#1F4A34" stroke-width="1.8"/><circle cx="12" cy="9" r="2.4" stroke="#1F4A34" stroke-width="1.8"/></svg>
+      </div>
+      <div class="gps-status" id="gps-status">Helymeghatározás folyamatban…</div>
+      <div class="gps-coords" id="gps-coords">— , —</div>
+      <div class="gps-distance" id="gps-distance"></div>
+    </div>
+
+    <button class="primary-btn" id="gps-confirm-btn" onclick="finishReport()" disabled>Ledobtam, pont igénylése</button>
+  </div>
+
+  <!-- ============ SUCCESS ============ -->
+  <div class="page" id="page-success">
+    <div class="success-wrap">
+      <svg class="burst" viewBox="0 0 120 120" fill="none">
+        <circle cx="60" cy="60" r="46" fill="#E7EFDC"/>
+        <path d="M60 100 L60 55" stroke="#CFE0BC" stroke-width="5" stroke-linecap="round"/>
+        <path d="M60 78 C 42 72, 34 58, 40 44" stroke="#E3982E" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <path d="M60 66 C 78 60, 86 48, 80 34" stroke="#E3982E" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <circle cx="60" cy="98" r="6" fill="#E3982E"/>
+      </svg>
+      <div class="eyebrow" style="color:var(--moss); font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.1em;">Megerősítve GPS-szel</div>
+      <div class="earned-pts" id="earned-pts-label">+25</div>
+      <h2>Szép munka!</h2>
+      <p>Eggyel kevesebb eldobott szemét. A pontjaid frissültek, és közelebb kerültél a következő szinthez.</p>
+      <button class="primary-btn" onclick="goHome()">Vissza a főoldalra</button>
+    </div>
+  </div>
+
+  <!-- ============ RANGLISTA ============ -->
+  <div class="page" id="page-rank">
+    <div class="home-header">
+      <div class="greeting"><div class="eyebrow">Ez heti</div><h2>Ranglista</h2></div>
+    </div>
+    <div id="rank-list"></div>
+    <div class="rank-note">A ranglista jelenleg csak a te eszközödön él — közösségi ranglistához majd egy szerver kell (2. fázis).</div>
+  </div>
+
+  <!-- ============ PROFIL ============ -->
+  <div class="page" id="page-profile">
+    <div class="profile-head">
+      <div class="avatar-lg">🌱</div>
+      <h2 id="profile-name">Te</h2>
+      <p id="profile-joined">Csatlakozott: —</p>
+    </div>
+    <div class="section-lbl">Kitüntetések</div>
+    <div class="badge-grid" id="badge-grid"></div>
+    <div class="section-lbl">Előzmények</div>
+    <div id="profile-history"></div>
+    <button class="danger-btn" onclick="resetData()">Helyi adatok törlése</button>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottomnav">
+    <button class="nav-btn active" data-nav="page-home" onclick="switchTab('page-home', this)">
+      <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 11l8-7 8 7v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1v-8z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+      Otthon
+    </button>
+    <button class="nav-btn" data-nav="page-rank" onclick="switchTab('page-rank', this)">
+      <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 01-12 0V4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+      Ranglista
+    </button>
+    <div class="nav-fab" onclick="goScan()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#F6F2E7" stroke-width="2.4" stroke-linecap="round"/></svg>
+    </div>
+    <button class="nav-btn" data-nav="page-profile" onclick="switchTab('page-profile', this)">
+      <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c1.2-4 4.2-6 7-6s5.8 2 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+      Profil
+    </button>
+  </div>
+
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
