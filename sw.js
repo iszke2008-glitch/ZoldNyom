@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zoldnyom-v1';
+const CACHE_NAME = 'zoldnyom-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -7,7 +7,8 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/icon-maskable-512.png'
+  './icons/icon-maskable-512.png',
+  './model/waste.tflite'
 ];
 
 self.addEventListener('install', (event) => {

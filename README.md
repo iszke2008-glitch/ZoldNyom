@@ -54,6 +54,20 @@ Amint élesben fut egy HTTPS címen:
 2. Koppints a "Telepítés" gombra (az app fent felajánlja), vagy a Chrome menüjében: *Hozzáadás a kezdőképernyőhöz*.
 3. Az app innentől saját ikonnal, teljes képernyőn, natív app-érzéssel nyílik meg.
 
+## Beépített kép-tartalom ellenőrzés (új)
+
+Az app mostantól a fotózás után automatikusan lefuttat egy **kép-felismerést a felhasználó telefonján**, mielőtt engedné továbblépni:
+
+- A modell forrása: [NSTiwari/TFJS-TFLite-Object-Detection](https://github.com/NSTiwari/TFJS-TFLite-Object-Detection) (MIT licenc), egy nyílt, "nyílt szemét / túltelt szemetes / műanyag / lebomló / orvosi hulladék" kategóriákon tanított TF Lite modell, amely részben a TACO-adathalmazt is használta.
+- A `model/waste.tflite` fájl (~7 MB) egyszer töltődik le, utána a service worker cache-eli — offline is működik.
+- **Nincs API-kulcs, nincs szerver, nincs havidíj** — a felismerés 100%-ban a felhasználó böngészőjében fut (`@tensorflow/tfjs` + `tfjs-tflite`, CDN-ről betöltve).
+- Ha a modell nem ismer fel egyértelmű szemetet a képen, figyelmeztetést kap a felhasználó, de nem blokkoljuk keményen — felajánljuk az újrapróbálást, de engedjük a folytatást is (ld. korábbi beszélgetésünket a réteges ellenőrzésről: ez egy *puha, kliens-oldali szűrő*, nem csalás-ellenőrzés).
+- A felismert kategóriát és a bizonyossági százalékot elmentjük a jelentés mellé — ez később egy szerver-oldali audit/moderáció számára is hasznos jel lesz.
+
+**Korlátok, amiket érdemes szem előtt tartani:**
+- Ez egy kliens-oldali ellenőrzés, tehát egy elszánt felhasználó a böngésző dev-eszközeivel megkerülheti — ahogy korábban átbeszéltük, a *jutalom-beváltásnál* ezért mindenképpen kell egy szigorúbb, szerver-oldali réteg is.
+- A modell 5 kategóriára lett tanítva; nem minden szemétfajtát ismer fel egyenlő pontossággal.
+
 ## Amit tudnia kell mielőtt szélesebb körben kiosztod
 
 - **Nincs csalás elleni védelem szerver oldalon.** Az adatok csak a saját eszközön élnek, bárki törölheti vagy módosíthatja a böngésző dev-eszközeiből. Ez rendben van egy MVP-teszthez, de egy közösségi ranglistához és megbízható pontrendszerhez **kell egy backend**, ami:

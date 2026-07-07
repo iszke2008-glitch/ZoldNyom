@@ -1,4 +1,86 @@
 // ---------------------------------------------
+// Kép-tartalom ellenőrzés — helyi, a telefonon futó szemét-felismerő modell
+// ---------------------------------------------
+// A modell forrása: NSTiwari/TFJS-TFLite-Object-Detection (MIT licenc), egy
+// nyílt, "open litter / túltelt szemetes / műanyag / lebomló / orvosi hulladék"
+// kategóriákon (részben TACO-adatokból) tanított TF Lite modell.
+// Semmi nem megy ki szerverre — a modell letöltés után teljesen a böngészőben fut.
+const WASTE_MODEL_PATH = './model/waste.tflite';
+const WASTE_CLASS_LABELS = {
+  0: 'Nyílt szemét',
+  1: 'Túltelt szemetes',
+  2: 'Műanyag hulladék',
+  3: 'Lebomló hulladék',
+  4: 'Orvosi hulladék'
+};
+const WASTE_THRESHOLD = 0.4;
+
+let wasteDetector = null;
+let wasteDetectorLoading = null;
+
+function loadImageFromDataURL(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Nem sikerült betölteni a képet'));
+    img.src = src;
+  });
+}
+
+// Előtölti a modellt a háttérben, hogy fotózáskor már gyors legyen a válasz.
+function preloadWasteDetector() {
+  if (typeof tflite === 'undefined') return;
+  if (!wasteDetector && !wasteDetectorLoading) {
+    wasteDetectorLoading = tflite.loadTFLiteModel(WASTE_MODEL_PATH)
+      .then((m) => { wasteDetector = m; return m; })
+      .catch((e) => { console.warn('Szemét-felismerő modell betöltése sikertelen', e); wasteDetectorLoading = null; });
+  }
+}
+
+// Visszaadja: { ok: boolean|null, labels: [{class, confidence}], error?: string }
+async function verifyLitterPhoto(photoDataURL) {
+  if (typeof tf === 'undefined' || typeof tflite === 'undefined') {
+    return { ok: null, labels: [], error: 'a felismerő könyvtár nem töltődött be' };
+  }
+  let input = null;
+  let outputs = null;
+  try {
+    if (!wasteDetector) {
+      preloadWasteDetector();
+      wasteDetector = await wasteDetectorLoading;
+    }
+    const img = await loadImageFromDataURL(photoDataURL);
+    input = tf.cast(tf.expandDims(tf.image.resizeBilinear(tf.browser.fromPixels(img), [448, 448])), 'int32');
+
+    const result = await wasteDetector.predict(input);
+    const keys = Object.keys(result);
+    outputs = keys.map((k) => result[k]);
+    const boxes = Array.from(await outputs[0].data());
+    const classes = Array.from(await outputs[1].data());
+    const scores = Array.from(await outputs[2].data());
+    const n = Array.from(await outputs[3].data())[0] || 0;
+
+    const labels = [];
+    for (let i = 0; i < n; i++) {
+      if (scores[i] > WASTE_THRESHOLD) {
+        labels.push({
+          class: WASTE_CLASS_LABELS[classes[i]] || ('Kategória ' + classes[i]),
+          confidence: Math.round(scores[i] * 100)
+        });
+      }
+    }
+    labels.sort((a, b) => b.confidence - a.confidence);
+    return { ok: labels.length > 0, labels };
+  } catch (e) {
+    console.warn('Litter-detekció sikertelen', e);
+    return { ok: null, labels: [], error: 'a modell futtatása sikertelen' };
+  } finally {
+    if (input) input.dispose();
+    if (outputs) outputs.forEach((t) => t && t.dispose && t.dispose());
+  }
+}
+
+// ---------------------------------------------
 // ZöldNyom — állapot és perzisztencia (localStorage)
 // ---------------------------------------------
 const STORAGE_KEY = 'zoldnyom_state_v1';
@@ -96,20 +178,24 @@ function goHome() {
 }
 
 function goScan() {
-  report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null };
+  report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null, detection: null };
   const frame = document.getElementById('cam-frame');
   frame.innerHTML =
     '<div class="cam-placeholder" id="cam-placeholder">📷<br>Érintsd meg a kamera bekapcsolásához</div>' +
     '<div class="cam-corner cc-tl"></div><div class="cam-corner cc-tr"></div><div class="cam-corner cc-bl"></div><div class="cam-corner cc-br"></div>';
+  const statusEl = document.getElementById('detect-status');
+  statusEl.className = 'detect-status';
+  statusEl.textContent = '';
   showPage('page-scan1');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   enableCamera();
+  preloadWasteDetector();
 }
 
 // ---------------------------------------------
 // Jelentés folyamat (fotó -> felvétel -> GPS -> pont)
 // ---------------------------------------------
-let report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null };
+let report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null, detection: null };
 let stream = null;
 
 async function enableCamera() {
@@ -142,9 +228,12 @@ function stopCamera() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 }
 
-function capturePhoto() {
+async function capturePhoto() {
   const frame = document.getElementById('cam-frame');
   const video = frame.querySelector('video');
+  const captureBtn = document.getElementById('capture-btn');
+  const statusEl = document.getElementById('detect-status');
+
   if (video && video.videoWidth) {
     const canvas = document.createElement('canvas');
     // kicsinyített, tárhely-barát méret
@@ -158,11 +247,52 @@ function capturePhoto() {
   } else {
     report.photoThumb = null; // nincs kamera-engedély, demó módban folytatjuk fotó nélkül
   }
+
+  report.detection = null;
+
+  if (report.photoThumb) {
+    captureBtn.disabled = true;
+    captureBtn.textContent = 'Kép elemzése…';
+    statusEl.className = 'detect-status checking';
+    statusEl.textContent = 'A fotó ellenőrzése folyamatban…';
+
+    const result = await verifyLitterPhoto(report.photoThumb);
+    report.detection = result;
+
+    captureBtn.disabled = false;
+    captureBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg> Fotó készítése';
+
+    if (result.ok === true) {
+      const top = result.labels[0];
+      statusEl.className = 'detect-status ok';
+      statusEl.textContent = `Felismerve: ${top.class} (${top.confidence}%)`;
+    } else if (result.ok === false) {
+      statusEl.className = 'detect-status warn';
+      statusEl.textContent = 'Nem sikerült egyértelműen szemetet felismerni — próbáld közelebbről, vagy folytasd, ha biztos vagy benne.';
+    } else {
+      statusEl.className = 'detect-status muted';
+      statusEl.textContent = 'A kép-ellenőrzés most nem elérhető, de folytathatod.';
+    }
+  }
+
   showPage('page-scan2');
   const previewFrame = document.getElementById('scan2-preview');
   previewFrame.innerHTML = report.photoThumb
     ? `<img src="${report.photoThumb}" alt="Rögzített fotó">`
     : '<div class="cam-placeholder" style="font-size:44px;">✅</div>';
+
+  const badge = document.getElementById('scan2-detect-badge');
+  if (report.detection && report.detection.ok === true) {
+    badge.className = 'detect-badge ok';
+    badge.textContent = `✓ Felismerve: ${report.detection.labels[0].class}`;
+    badge.style.display = 'block';
+  } else if (report.detection && report.detection.ok === false) {
+    badge.className = 'detect-badge warn';
+    badge.textContent = '⚠ Nem egyértelmű, hogy szemetet fotóztál';
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function toRad(v) { return (v * Math.PI) / 180; }
@@ -211,14 +341,18 @@ function startGPS() {
 function finishReport() {
   const pts = 25;
   state.points += pts;
+  const detectedLabel = (report.detection && report.detection.ok === true)
+    ? report.detection.labels[0].class
+    : null;
   state.history.unshift({
     id: 'r_' + Date.now(),
-    label: 'Szemét — bejelentve',
+    label: detectedLabel ? ('Szemét — ' + detectedLabel) : 'Szemét — bejelentve',
     icon: '🗑️',
     pts,
     photo: report.photoThumb,
     lat: report.disposeLat,
     lon: report.disposeLon,
+    detection: report.detection,
     ts: new Date().toISOString()
   });
   saveState();

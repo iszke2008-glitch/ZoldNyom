@@ -17,6 +17,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/tf-tflite.min.js"></script>
 </head>
 <body>
 
@@ -95,7 +98,9 @@
       <div class="cam-corner cc-bl"></div><div class="cam-corner cc-br"></div>
     </div>
 
-    <button class="primary-btn" onclick="capturePhoto()">
+    <div class="detect-status" id="detect-status"></div>
+
+    <button class="primary-btn" id="capture-btn" onclick="capturePhoto()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg>
       Fotó készítése
     </button>
@@ -118,6 +123,7 @@
     </div>
 
     <div class="cam-frame" id="scan2-preview" style="aspect-ratio:1/1;"></div>
+    <div class="detect-badge" id="scan2-detect-badge" style="display:none;"></div>
 
     <button class="primary-btn" onclick="showPage('page-scan3'); startGPS();">Felvettem, tovább</button>
     <button class="ghost-btn" onclick="showPage('page-scan1')">Mégsem</button>
