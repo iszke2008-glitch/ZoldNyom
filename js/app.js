@@ -13,7 +13,7 @@ const WASTE_CLASS_LABELS = {
   3: 'Lebomló hulladék',
   4: 'Orvosi hulladék'
 };
-const WASTE_THRESHOLD = 0.4;
+const WASTE_THRESHOLD = 0.51;
 
 let wasteDetector = null;
 let wasteDetectorLoading = null;
@@ -62,7 +62,7 @@ async function verifyLitterPhoto(photoDataURL) {
 
     const labels = [];
     for (let i = 0; i < n; i++) {
-      if (scores[i] > WASTE_THRESHOLD) {
+      if (scores[i] >= WASTE_THRESHOLD) {
         labels.push({
           class: WASTE_CLASS_LABELS[classes[i]] || ('Kategória ' + classes[i]),
           confidence: Math.round(scores[i] * 100)
@@ -94,12 +94,19 @@ const STAGES = [
 ];
 
 const BADGE_DEFS = [
-  { id: 'first',   ic: '🥇', name: 'Első jelentés', check: (s) => s.history.length >= 1 },
-  { id: 'streak3', ic: '🔥', name: '3 napos sorozat', check: (s) => currentStreak(s) >= 3 },
-  { id: 'ten',     ic: '♻️', name: '10 szemét', check: (s) => s.history.length >= 10 },
-  { id: 'tree',    ic: '🌳', name: 'Fiatal fa szint', check: (s) => s.points >= 350 },
-  { id: 'forest',  ic: '🌲', name: 'Erdőjáró szint', check: (s) => s.points >= 700 },
-  { id: 'top3',    ic: '🏆', name: 'Top 3 hetente', check: () => false } // szerver nélkül nem eldönthető, jövőbeli funkció
+  { id: 'first',      ic: '🥇', name: 'Első jelentés', check: (s) => s.history.length >= 1 },
+  { id: 'streak3',    ic: '🔥', name: '3 napos sorozat', check: (s) => currentStreak(s) >= 3 },
+  { id: 'streak7',    ic: '📅', name: 'Hétköznapi hős', check: (s) => currentStreak(s) >= 7 },
+  { id: 'streak30',   ic: '🛡️', name: 'Erdőőr', check: (s) => currentStreak(s) >= 30 },
+  { id: 'ten',        ic: '♻️', name: '10 szemét', check: (s) => s.history.length >= 10 },
+  { id: 'litterpatrol', ic: '🧹', name: 'Tisztasági őrjárat', check: (s) => countByWasteClass(s, 'Nyílt szemét') >= 10 },
+  { id: 'plastichunter', ic: '🧴', name: 'Műanyag-vadász', check: (s) => countByWasteClass(s, 'Műanyag hulladék') >= 20 },
+  { id: 'greenheart', ic: '💚', name: 'Zöld szív', check: (s) => countByWasteClass(s, 'Lebomló hulladék') >= 5 },
+  { id: 'earlybird',  ic: '🌅', name: 'Hajnali madár', check: (s) => hasEarlyMorningReport(s) },
+  { id: 'pioneer',    ic: '🧭', name: 'Úttörő', check: (s) => distinctLocationCount(s, 150) >= 3 },
+  { id: 'tree',       ic: '🌳', name: 'Fiatal fa szint', check: (s) => s.points >= 350 },
+  { id: 'forest',     ic: '🌲', name: 'Erdőjáró szint', check: (s) => s.points >= 700 },
+  { id: 'top3',       ic: '🏆', name: 'Top 3 hetente', check: () => false } // szerver nélkül nem eldönthető, jövőbeli funkció
 ];
 
 function defaultState() {
@@ -141,6 +148,30 @@ function currentStreak(s) {
     d.setDate(d.getDate() - 1);
   }
   return streak;
+}
+
+function countByWasteClass(s, className) {
+  return s.history.filter(h => h.detection && h.detection.labels && h.detection.labels[0] && h.detection.labels[0].class === className).length;
+}
+
+function hasEarlyMorningReport(s) {
+  return s.history.some(h => {
+    const hour = new Date(h.ts).getHours();
+    return hour >= 5 && hour < 8;
+  });
+}
+
+// Mivel nincs szerver/közösségi adat, az "Úttörő" jelvényt lokálisan úgy értelmezzük:
+// legalább 3, egymástól kellően távoli (150 m+) helyszínen jelentettél már — vagyis
+// nem csak egyetlen helyre jársz vissza, hanem több különböző helyet is "felfedeztél".
+function distinctLocationCount(s, thresholdMeters) {
+  const points = s.history.filter(h => h.lat != null && h.lon != null);
+  const clusters = [];
+  points.forEach(p => {
+    const isNew = clusters.every(c => distanceMeters(c.lat, c.lon, p.lat, p.lon) > thresholdMeters);
+    if (isNew) clusters.push({ lat: p.lat, lon: p.lon });
+  });
+  return clusters.length;
 }
 
 let state = loadState();
@@ -200,6 +231,8 @@ let stream = null;
 
 async function enableCamera() {
   const frame = document.getElementById('cam-frame');
+  const existingVideo = frame.querySelector('video');
+  if (existingVideo) existingVideo.remove();
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     const placeholder = document.getElementById('cam-placeholder');
@@ -243,56 +276,56 @@ async function capturePhoto() {
     canvas.height = Math.round(targetW * ratio);
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     report.photoThumb = canvas.toDataURL('image/jpeg', 0.7);
-    stopCamera();
   } else {
-    report.photoThumb = null; // nincs kamera-engedély, demó módban folytatjuk fotó nélkül
+    report.photoThumb = null;
+    statusEl.className = 'detect-status warn';
+    statusEl.textContent = 'Nincs élő kamerakép — indítsd újra a kamerát, majd próbáld újra.';
+    return;
   }
 
   report.detection = null;
+  captureBtn.disabled = true;
+  captureBtn.textContent = 'Kép elemzése…';
+  statusEl.className = 'detect-status checking';
+  statusEl.textContent = 'A fotó ellenőrzése folyamatban…';
 
-  if (report.photoThumb) {
-    captureBtn.disabled = true;
-    captureBtn.textContent = 'Kép elemzése…';
-    statusEl.className = 'detect-status checking';
-    statusEl.textContent = 'A fotó ellenőrzése folyamatban…';
+  const result = await verifyLitterPhoto(report.photoThumb);
+  report.detection = result;
 
-    const result = await verifyLitterPhoto(report.photoThumb);
-    report.detection = result;
+  captureBtn.disabled = false;
+  captureBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg> Fotó készítése';
 
-    captureBtn.disabled = false;
-    captureBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg> Fotó készítése';
+  if (result.ok === true) {
+    // Legalább 51%-os biztonsággal felismert szemét — mehet tovább.
+    stopCamera();
+    const top = result.labels[0];
+    statusEl.className = 'detect-status ok';
+    statusEl.textContent = `Felismerve: ${top.class} (${top.confidence}%)`;
 
-    if (result.ok === true) {
-      const top = result.labels[0];
-      statusEl.className = 'detect-status ok';
-      statusEl.textContent = `Felismerve: ${top.class} (${top.confidence}%)`;
-    } else if (result.ok === false) {
-      statusEl.className = 'detect-status warn';
-      statusEl.textContent = 'Nem sikerült egyértelműen szemetet felismerni — próbáld közelebbről, vagy folytasd, ha biztos vagy benne.';
-    } else {
-      statusEl.className = 'detect-status muted';
-      statusEl.textContent = 'A kép-ellenőrzés most nem elérhető, de folytathatod.';
-    }
-  }
+    showPage('page-scan2');
+    const previewFrame = document.getElementById('scan2-preview');
+    previewFrame.innerHTML = `<img src="${report.photoThumb}" alt="Rögzített fotó">`;
 
-  showPage('page-scan2');
-  const previewFrame = document.getElementById('scan2-preview');
-  previewFrame.innerHTML = report.photoThumb
-    ? `<img src="${report.photoThumb}" alt="Rögzített fotó">`
-    : '<div class="cam-placeholder" style="font-size:44px;">✅</div>';
-
-  const badge = document.getElementById('scan2-detect-badge');
-  if (report.detection && report.detection.ok === true) {
+    const badge = document.getElementById('scan2-detect-badge');
     badge.className = 'detect-badge ok';
-    badge.textContent = `✓ Felismerve: ${report.detection.labels[0].class}`;
+    badge.textContent = `✓ Felismerve: ${top.class} (${top.confidence}%)`;
     badge.style.display = 'block';
-  } else if (report.detection && report.detection.ok === false) {
-    badge.className = 'detect-badge warn';
-    badge.textContent = '⚠ Nem egyértelmű, hogy szemetet fotóztál';
-    badge.style.display = 'block';
-  } else {
-    badge.style.display = 'none';
+    return;
   }
+
+  // Nem sikerült elég magas biztonsággal felismerni szemetet — nem engedjük tovább.
+  if (result.ok === false) {
+    statusEl.className = 'detect-status warn';
+    statusEl.textContent = 'Nem sikerült legalább 51%-os biztonsággal szemetet felismerni a képen. Próbáld közelebbről, jobb megvilágításban lefotózni.';
+  } else {
+    statusEl.className = 'detect-status warn';
+    statusEl.textContent = 'A kép-ellenőrzés most nem sikerült (pl. gyenge internetkapcsolat). Próbáld újra.';
+  }
+
+  // Kamera újraindítása, hogy azonnal újra lehessen próbálni — a felhasználó a scan1 oldalon marad.
+  report.photoThumb = null;
+  stopCamera();
+  await enableCamera();
 }
 
 function toRad(v) { return (v * Math.PI) / 180; }
@@ -383,9 +416,9 @@ function renderHome() {
     fillEl.style.width = '100%';
     noteEl.textContent = 'Elérted a legmagasabb szintet — Erdőjáró!';
   }
-  ['leaf-l1', 'leaf-r1', 'leaf-l2'].forEach((id, i) => {
-    document.getElementById(id).style.opacity = idx >= i + 1 ? 1 : (i === 0 ? 1 : 0.15);
-  });
+  document.querySelectorAll('.plant-stage').forEach((g) => g.classList.remove('active'));
+  const stageEl = document.getElementById('plant-stage-' + idx);
+  if (stageEl) stageEl.classList.add('active');
 
   const list = document.getElementById('recent-list');
   if (!state.history.length) {
