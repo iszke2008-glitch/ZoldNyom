@@ -215,7 +215,7 @@ function goHome() {
 }
 
 function goScan() {
-  report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null, detection: null };
+  report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null, detection: null, userLabel: null };
   const frame = document.getElementById('cam-frame');
   frame.innerHTML =
     '<div class="cam-placeholder" id="cam-placeholder">📷<br>Érintsd meg a kamera bekapcsolásához</div>' +
@@ -232,7 +232,7 @@ function goScan() {
 // ---------------------------------------------
 // Jelentés folyamat (fotó -> felvétel -> GPS -> pont)
 // ---------------------------------------------
-let report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null, detection: null };
+let report = { photoThumb: null, foundLat: null, foundLon: null, disposeLat: null, disposeLon: null, detection: null, userLabel: null };
 let stream = null;
 
 async function enableCamera() {
@@ -278,6 +278,30 @@ function renderDetectChips(container, labels) {
   `).join('');
 }
 
+// A felhasználói visszajelzés-választó (melyik kategória volt valójában) — előre
+// kiválasztva a modell top-1 találata, "Nem szemét volt" opcióval a negatív
+// példák gyűjtéséhez (ezek nélkül a jövőbeli újratanítás torzított lenne).
+const FEEDBACK_OPTIONS = [...Object.values(WASTE_CLASS_LABELS), 'Nem szemét volt'];
+
+function renderFeedbackChips() {
+  const container = document.getElementById('feedback-chips');
+  container.innerHTML = FEEDBACK_OPTIONS.map((label) => {
+    const isNotLitter = label === 'Nem szemét volt';
+    const selected = report.userLabel === label;
+    return `<button type="button" class="feedback-chip ${isNotLitter ? 'not-litter' : ''} ${selected ? 'selected' : ''}" data-label="${label}">${label}</button>`;
+  }).join('');
+}
+
+function selectFeedback(label) {
+  report.userLabel = label;
+  renderFeedbackChips();
+}
+
+document.addEventListener('click', (e) => {
+  const chip = e.target.closest('.feedback-chip');
+  if (chip) selectFeedback(chip.dataset.label);
+});
+
 async function capturePhoto() {
   const frame = document.getElementById('cam-frame');
   const video = frame.querySelector('video');
@@ -319,9 +343,11 @@ async function capturePhoto() {
     statusEl.className = 'detect-status muted';
     statusEl.textContent = 'A modell szerint ezek a legvalószínűbb kategóriák:';
     renderDetectChips(listEl, result.labels);
+    report.userLabel = result.labels[0].class; // előre kiválasztjuk a modell tippjét, a felhasználó módosíthatja
   } else if (result.ok === false) {
     statusEl.className = 'detect-status muted';
     statusEl.textContent = 'A modell nem talált egyértelmű kategóriát a képen, de folytathatod.';
+    report.userLabel = null;
   } else {
     statusEl.className = 'detect-status muted';
     statusEl.textContent = 'A kép-ellenőrzés most nem elérhető, de folytathatod.';
@@ -334,6 +360,7 @@ async function capturePhoto() {
 
   const scan2List = document.getElementById('scan2-detect-list');
   renderDetectChips(scan2List, result.ok === true ? result.labels : []);
+  renderFeedbackChips();
 }
 
 function toRad(v) { return (v * Math.PI) / 180; }
@@ -394,6 +421,7 @@ function finishReport() {
     lat: report.disposeLat,
     lon: report.disposeLon,
     detection: report.detection,
+    userLabel: report.userLabel || null,
     ts: new Date().toISOString()
   });
   saveState();
