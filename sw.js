@@ -1,19 +1,26 @@
-const CACHE_NAME = 'zoldnyom-v2';
-const APP_SHELL = [
-  './',
-  './index.html',
-  './css/styles.css',
-  './js/app.js',
-  './manifest.webmanifest',
+const CACHE_NAME = 'zoldnyom-v3';
+
+// Ritkán változó, nagy fájlok — ezeket cache-first módon szolgáljuk ki (gyors, spórol adatforgalmat).
+const STATIC_FILES = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './model/waste.tflite'
 ];
 
+// Az app "váza" — ezek gyakran változnak fejlesztés közben, ezért mindig a legfrissebbet
+// próbáljuk betölteni a hálózatról, és csak akkor esünk vissza a cache-re, ha nincs net.
+const SHELL_FILES = [
+  './',
+  './index.html',
+  './css/styles.css',
+  './js/app.js',
+  './manifest.webmanifest'
+];
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll([...STATIC_FILES, ...SHELL_FILES]))
   );
   self.skipWaiting();
 });
@@ -27,20 +34,40 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-first for app shell, network passthrough for everything else (e.g. geolocation is not a fetch anyway)
+function isShellPath(pathname) {
+  if (pathname === '/' || pathname.endsWith('/index.html')) return true;
+  return SHELL_FILES.some((f) => f !== './' && pathname.endsWith(f.replace('./', '/')));
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        // don't cache opaque/cross-origin responses (e.g. Google Fonts) aggressively wrong
-        if (response && response.status === 200 && response.type === 'basic') {
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return; // külső (CDN) kéréseket nem piszkáljuk
+
+  if (isShellPath(url.pathname)) {
+    // Network-first: mindig a legfrissebb verziót próbáljuk betölteni.
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
-    })
-  );
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+  } else {
+    // Cache-first a statikus, nagy fájloknak (ikonok, AI-modell).
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response && response.status === 200 && response.type === 'basic') {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        });
+      })
+    );
+  }
 });
