@@ -50,12 +50,63 @@
         <div class="pts"><span id="pts-display">0</span><span>pontod</span></div>
       </div>
       <div class="plant-wrap">
-        <svg id="plant-svg" width="150" height="86" viewBox="0 0 150 86" fill="none">
-          <path d="M75 86 L75 40" stroke="#CFE0BC" stroke-width="4" stroke-linecap="round"/>
-          <path id="leaf-l1" d="M75 60 C 55 55, 45 40, 50 25" stroke="#E3982E" stroke-width="4" stroke-linecap="round" fill="none"/>
-          <path id="leaf-r1" d="M75 50 C 95 45, 105 32, 100 18" stroke="#E3982E" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.35"/>
-          <path id="leaf-l2" d="M75 40 C 58 33, 52 18, 60 6" stroke="#E3982E" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.15"/>
-          <circle cx="75" cy="84" r="6" fill="#E3982E"/>
+        <svg id="plant-svg" width="180" height="132" viewBox="0 0 200 150" fill="none">
+          <ellipse cx="100" cy="133" rx="72" ry="9" fill="#CFE0BC" opacity="0.3"/>
+
+          <!-- Szint 0 — Mag -->
+          <g class="plant-stage" id="plant-stage-0">
+            <ellipse cx="100" cy="122" rx="13" ry="10" fill="#E3982E"/>
+            <path d="M91 119 Q100 126 109 119" stroke="#153726" stroke-width="1.4" fill="none" opacity="0.35" stroke-linecap="round"/>
+            <circle cx="74" cy="102" r="2.4" fill="#CFE0BC" opacity="0.8"/>
+            <circle cx="126" cy="96" r="2" fill="#CFE0BC" opacity="0.6"/>
+            <circle cx="100" cy="82" r="2.6" fill="#CFE0BC" opacity="0.7"/>
+          </g>
+
+          <!-- Szint 1 — Csíra -->
+          <g class="plant-stage" id="plant-stage-1">
+            <path d="M100 130 L100 96" stroke="#E3982E" stroke-width="4" stroke-linecap="round"/>
+            <path d="M100 99 C 84 94, 74 104, 81 117 C 89 111, 97 103, 100 99 Z" fill="#E3982E"/>
+            <path d="M100 99 C 116 94, 126 104, 119 117 C 111 111, 103 103, 100 99 Z" fill="#E3982E"/>
+            <circle cx="100" cy="95" r="3.5" fill="#F6D9A8"/>
+          </g>
+
+          <!-- Szint 2 — Hajtás -->
+          <g class="plant-stage" id="plant-stage-2">
+            <path d="M100 130 L100 72" stroke="#E3982E" stroke-width="4.5" stroke-linecap="round"/>
+            <path d="M100 112 C 82 107, 71 118, 79 131 C 88 124, 97 115, 100 112 Z" fill="#E3982E"/>
+            <path d="M100 112 C 118 107, 129 118, 121 131 C 112 124, 103 115, 100 112 Z" fill="#E3982E"/>
+            <path d="M100 88 C 87 84, 79 92, 85 102 C 91 97, 98 90, 100 88 Z" fill="#E3982E" opacity="0.9"/>
+            <path d="M100 88 C 113 84, 121 92, 115 102 C 109 97, 102 90, 100 88 Z" fill="#E3982E" opacity="0.9"/>
+            <circle cx="100" cy="70" r="5.5" fill="#F6D9A8"/>
+          </g>
+
+          <!-- Szint 3 — Fiatal fa -->
+          <g class="plant-stage" id="plant-stage-3">
+            <path d="M100 130 L100 62" stroke="#E3982E" stroke-width="6" stroke-linecap="round"/>
+            <path d="M100 82 L83 66" stroke="#E3982E" stroke-width="3" stroke-linecap="round"/>
+            <path d="M100 82 L117 66" stroke="#E3982E" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="80" cy="60" r="21" fill="#E3982E" opacity="0.88"/>
+            <circle cx="120" cy="60" r="21" fill="#E3982E" opacity="0.88"/>
+            <circle cx="100" cy="42" r="25" fill="#E3982E" opacity="0.95"/>
+            <circle cx="100" cy="56" r="14" fill="#F6D9A8" opacity="0.55"/>
+          </g>
+
+          <!-- Szint 4 — Erdőjáró -->
+          <g class="plant-stage" id="plant-stage-4">
+            <path d="M38 130 L38 103" stroke="#CFE0BC" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+            <circle cx="38" cy="93" r="15" fill="#CFE0BC" opacity="0.55"/>
+            <path d="M162 130 L162 108" stroke="#CFE0BC" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+            <circle cx="162" cy="98" r="12" fill="#CFE0BC" opacity="0.5"/>
+
+            <path d="M100 130 L100 50" stroke="#E3982E" stroke-width="7" stroke-linecap="round"/>
+            <path d="M100 74 L78 54" stroke="#E3982E" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M100 74 L122 54" stroke="#E3982E" stroke-width="3.5" stroke-linecap="round"/>
+            <circle cx="72" cy="55" r="25" fill="#E3982E" opacity="0.88"/>
+            <circle cx="128" cy="55" r="25" fill="#E3982E" opacity="0.88"/>
+            <circle cx="100" cy="34" r="30" fill="#E3982E" opacity="0.95"/>
+            <circle cx="100" cy="52" r="17" fill="#F6D9A8" opacity="0.55"/>
+            <path d="M124 42 q4 -7 8 0 q4 -7 8 0" stroke="#153726" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </g>
         </svg>
       </div>
       <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%;"></div></div>
