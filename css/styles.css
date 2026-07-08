@@ -121,6 +121,12 @@ button{font-family:inherit;}
 .detect-badge.ok{background:var(--leaf-pale); color:var(--forest-deep);}
 .detect-badge.warn{background:#FBEAE3; color:#8A4526;}
 
+.detect-list{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px;}
+.detect-list:empty{display:none; margin-bottom:0;}
+.detect-chip{display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:6px 12px; border-radius:99px; background:var(--white); border:1px solid var(--line); color:var(--ink-soft);}
+.detect-chip.top{background:var(--leaf-pale); border-color:var(--leaf-pale); color:var(--forest-deep); font-weight:700;}
+.detect-chip .pct{font-family:'Fraunces',serif; font-weight:700;}
+
 .step-copy{margin-bottom:16px;}
 .step-copy h2{font-size:21px; color:var(--forest-deep); margin:0 0 6px;}
 .step-copy p{font-size:14px; color:var(--ink-soft); line-height:1.55; margin:0;}

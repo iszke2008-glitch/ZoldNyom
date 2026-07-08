@@ -61,14 +61,21 @@ async function verifyLitterPhoto(photoDataURL) {
     const scores = Array.from(await outputs[2].data());
     const n = Array.from(await outputs[3].data())[0] || 0;
 
-    const labels = [];
+    const raw = [];
     for (let i = 0; i < n; i++) {
-      labels.push({
+      raw.push({
         class: WASTE_CLASS_LABELS[classes[i]] || ('Kategória ' + classes[i]),
         confidence: Math.round(scores[i] * 100)
       });
     }
-    labels.sort((a, b) => b.confidence - a.confidence);
+    // Osztályonként csak a legjobb (legmagasabb %) találatot tartjuk meg,
+    // hogy ne szerepelhessen ugyanaz a kategória többször a top listában.
+    const bestByClass = new Map();
+    raw.forEach((r) => {
+      const existing = bestByClass.get(r.class);
+      if (!existing || r.confidence > existing.confidence) bestByClass.set(r.class, r);
+    });
+    const labels = Array.from(bestByClass.values()).sort((a, b) => b.confidence - a.confidence);
     return { ok: labels.length > 0, labels };
   } catch (e) {
     console.warn('Litter-detekció sikertelen', e);
@@ -260,11 +267,23 @@ function stopCamera() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 }
 
+// Legfeljebb 3 legjobb találatot jelenít meg apró "chip" formában, %-kal.
+function renderDetectChips(container, labels) {
+  if (!labels || !labels.length) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = labels.slice(0, 3).map((l, i) => `
+    <span class="detect-chip ${i === 0 ? 'top' : ''}">${l.class} <span class="pct">${l.confidence}%</span></span>
+  `).join('');
+}
+
 async function capturePhoto() {
   const frame = document.getElementById('cam-frame');
   const video = frame.querySelector('video');
   const captureBtn = document.getElementById('capture-btn');
   const statusEl = document.getElementById('detect-status');
+  const listEl = document.getElementById('detect-list');
 
   if (video && video.videoWidth) {
     const canvas = document.createElement('canvas');
@@ -287,6 +306,7 @@ async function capturePhoto() {
   captureBtn.textContent = 'Kép elemzése…';
   statusEl.className = 'detect-status checking';
   statusEl.textContent = 'A fotó ellenőrzése folyamatban…';
+  listEl.innerHTML = '';
 
   const result = await verifyLitterPhoto(report.photoThumb);
   report.detection = result;
@@ -295,10 +315,10 @@ async function capturePhoto() {
   captureBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg> Fotó készítése';
 
   if (result.ok === true) {
-    // Van legjobb találat — kiírjuk a kategóriát és a bizonyossági százalékot, de nem blokkolunk vele.
-    const top = result.labels[0];
-    statusEl.className = 'detect-status ok';
-    statusEl.textContent = `Felismerve: ${top.class} (${top.confidence}%)`;
+    // Több jelölt is lehet — a top-3-at chip-listaként mutatjuk, informatívan, nem blokkolva vele.
+    statusEl.className = 'detect-status muted';
+    statusEl.textContent = 'A modell szerint ezek a legvalószínűbb kategóriák:';
+    renderDetectChips(listEl, result.labels);
   } else if (result.ok === false) {
     statusEl.className = 'detect-status muted';
     statusEl.textContent = 'A modell nem talált egyértelmű kategóriát a képen, de folytathatod.';
@@ -312,15 +332,8 @@ async function capturePhoto() {
   const previewFrame = document.getElementById('scan2-preview');
   previewFrame.innerHTML = `<img src="${report.photoThumb}" alt="Rögzített fotó">`;
 
-  const badge = document.getElementById('scan2-detect-badge');
-  if (result.ok === true) {
-    const top = result.labels[0];
-    badge.className = 'detect-badge ok';
-    badge.textContent = `Felismerve: ${top.class} (${top.confidence}%)`;
-    badge.style.display = 'block';
-  } else {
-    badge.style.display = 'none';
-  }
+  const scan2List = document.getElementById('scan2-detect-list');
+  renderDetectChips(scan2List, result.ok === true ? result.labels : []);
 }
 
 function toRad(v) { return (v * Math.PI) / 180; }

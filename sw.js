@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zoldnyom-v4';
+const CACHE_NAME = 'zoldnyom-v5';
 
 // Ritkán változó, nagy fájlok — ezeket cache-first módon szolgáljuk ki (gyors, spórol adatforgalmat).
 const STATIC_FILES = [
