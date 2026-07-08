@@ -13,7 +13,8 @@ const WASTE_CLASS_LABELS = {
   3: 'Lebomló hulladék',
   4: 'Orvosi hulladék'
 };
-const WASTE_THRESHOLD = 0.51;
+// Nincs elfogadási küszöb — mindig a modell legjobb találatát mutatjuk meg,
+// a hozzá tartozó bizonyossági százalékkal együtt (tisztán informatív, nem blokkoló).
 
 let wasteDetector = null;
 let wasteDetectorLoading = null;
@@ -62,12 +63,10 @@ async function verifyLitterPhoto(photoDataURL) {
 
     const labels = [];
     for (let i = 0; i < n; i++) {
-      if (scores[i] >= WASTE_THRESHOLD) {
-        labels.push({
-          class: WASTE_CLASS_LABELS[classes[i]] || ('Kategória ' + classes[i]),
-          confidence: Math.round(scores[i] * 100)
-        });
-      }
+      labels.push({
+        class: WASTE_CLASS_LABELS[classes[i]] || ('Kategória ' + classes[i]),
+        confidence: Math.round(scores[i] * 100)
+      });
     }
     labels.sort((a, b) => b.confidence - a.confidence);
     return { ok: labels.length > 0, labels };
@@ -296,36 +295,32 @@ async function capturePhoto() {
   captureBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg> Fotó készítése';
 
   if (result.ok === true) {
-    // Legalább 51%-os biztonsággal felismert szemét — mehet tovább.
-    stopCamera();
+    // Van legjobb találat — kiírjuk a kategóriát és a bizonyossági százalékot, de nem blokkolunk vele.
     const top = result.labels[0];
     statusEl.className = 'detect-status ok';
     statusEl.textContent = `Felismerve: ${top.class} (${top.confidence}%)`;
-
-    showPage('page-scan2');
-    const previewFrame = document.getElementById('scan2-preview');
-    previewFrame.innerHTML = `<img src="${report.photoThumb}" alt="Rögzített fotó">`;
-
-    const badge = document.getElementById('scan2-detect-badge');
-    badge.className = 'detect-badge ok';
-    badge.textContent = `✓ Felismerve: ${top.class} (${top.confidence}%)`;
-    badge.style.display = 'block';
-    return;
-  }
-
-  // Nem sikerült elég magas biztonsággal felismerni szemetet — nem engedjük tovább.
-  if (result.ok === false) {
-    statusEl.className = 'detect-status warn';
-    statusEl.textContent = 'Nem sikerült legalább 51%-os biztonsággal szemetet felismerni a képen. Próbáld közelebbről, jobb megvilágításban lefotózni.';
+  } else if (result.ok === false) {
+    statusEl.className = 'detect-status muted';
+    statusEl.textContent = 'A modell nem talált egyértelmű kategóriát a képen, de folytathatod.';
   } else {
-    statusEl.className = 'detect-status warn';
-    statusEl.textContent = 'A kép-ellenőrzés most nem sikerült (pl. gyenge internetkapcsolat). Próbáld újra.';
+    statusEl.className = 'detect-status muted';
+    statusEl.textContent = 'A kép-ellenőrzés most nem elérhető, de folytathatod.';
   }
 
-  // Kamera újraindítása, hogy azonnal újra lehessen próbálni — a felhasználó a scan1 oldalon marad.
-  report.photoThumb = null;
   stopCamera();
-  await enableCamera();
+  showPage('page-scan2');
+  const previewFrame = document.getElementById('scan2-preview');
+  previewFrame.innerHTML = `<img src="${report.photoThumb}" alt="Rögzített fotó">`;
+
+  const badge = document.getElementById('scan2-detect-badge');
+  if (result.ok === true) {
+    const top = result.labels[0];
+    badge.className = 'detect-badge ok';
+    badge.textContent = `Felismerve: ${top.class} (${top.confidence}%)`;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function toRad(v) { return (v * Math.PI) / 180; }
