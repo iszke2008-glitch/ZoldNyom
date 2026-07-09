@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zoldnyom-v7';
+const CACHE_NAME = 'zoldnyom-v8';
 
 // Ritkán változó, nagy fájlok — ezeket cache-first módon szolgáljuk ki (gyors, spórol adatforgalmat).
 const STATIC_FILES = [
@@ -15,6 +15,7 @@ const SHELL_FILES = [
   './index.html',
   './css/styles.css',
   './js/app.js',
+  './js/firebase-init.js',
   './manifest.webmanifest'
 ];
 

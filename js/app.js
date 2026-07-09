@@ -142,7 +142,8 @@ function defaultState() {
     name: 'Te',
     joined: new Date().toISOString(),
     points: 0,
-    history: [] // { id, label, icon, pts, photo (dataURL thumb), lat, lon, ts }
+    trainingConsent: false, // alapból KIKAPCSOLVA — explicit hozzájárulás kell a Profil oldalon
+    history: [] // { id, label, icon, pts, photo (dataURL thumb), lat, lon, ts, userLabel }
   };
 }
 
@@ -448,11 +449,49 @@ function finishReport() {
     ts: new Date().toISOString()
   });
   saveState();
+  uploadTrainingSample(); // csak akkor csinál bármit, ha a felhasználó hozzájárult
   document.getElementById('earned-pts-label').textContent = '+' + pts;
   showPage('page-success');
 }
 
 // ---------------------------------------------
+// Tanító adat feltöltése (Firebase) — csak explicit hozzájárulás esetén.
+// Sosem blokkolja a folyamatot: ha bármi hiba történik (nincs net, Firebase
+// hiba stb.), csendben kihagyjuk, a felhasználó pontja/jelentése attól függetlenül megvan.
+// ---------------------------------------------
+async function uploadTrainingSample() {
+  if (!state.trainingConsent) return;
+  if (!report.userLabel) return; // nincs értelmes címke, amiből tanulni lehetne
+  if (!report.photoThumb) return;
+  if (typeof firebase === 'undefined' || !navigator.onLine) return;
+
+  try {
+    if (typeof fbReady !== 'undefined') await fbReady;
+    const uid = (fbAuth.currentUser && fbAuth.currentUser.uid) || 'ismeretlen';
+    const path = `training-photos/${uid}/${Date.now()}.jpg`;
+
+    const blob = await (await fetch(report.photoThumb)).blob();
+    await fbStorage.ref(path).put(blob);
+
+    await fbDb.collection('trainingSubmissions').add({
+      category: report.userLabel,
+      aiGuess: (report.detection && report.detection.ok === true) ? report.detection.labels.slice(0, 3) : [],
+      lat: report.disposeLat || null,
+      lon: report.disposeLon || null,
+      photoPath: path,
+      moderationStatus: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) {
+    console.warn('Tanító adat feltöltése sikertelen (nem blokkoló):', e);
+  }
+}
+
+function toggleTrainingConsent() {
+  state.trainingConsent = !state.trainingConsent;
+  saveState();
+  renderProfile();
+}
 // Renderelés
 // ---------------------------------------------
 function renderHome() {
@@ -518,6 +557,9 @@ function renderRank() {
 function renderProfile() {
   document.getElementById('profile-joined').textContent =
     'Csatlakozott: ' + new Date(state.joined).toLocaleDateString('hu-HU', { year: 'numeric', month: 'long' });
+
+  const consentToggle = document.getElementById('consent-toggle');
+  if (consentToggle) consentToggle.checked = !!state.trainingConsent;
 
   const grid = document.getElementById('badge-grid');
   grid.innerHTML = BADGE_DEFS.map(b => {

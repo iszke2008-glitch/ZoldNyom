@@ -20,6 +20,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/tf-tflite.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-storage-compat.js"></script>
+<script src="js/firebase-init.js"></script>
 </head>
 <body>
 
@@ -248,6 +253,19 @@
       <h2 id="profile-name">Te</h2>
       <p id="profile-joined">Csatlakozott: —</p>
     </div>
+    <div class="consent-box">
+      <div class="consent-row">
+        <div class="consent-text">
+          <b>Segítsd a felismerő rendszer fejlesztését</b>
+          <span>Ha bekapcsolod, a jelentéseidhez tartozó fotó és az általad választott kategória felhasználásra kerülhet egy jövőbeli, pontosabb felismerő modell tanításához. Emberi átnézés (moderáció) nélkül semmi nem kerül be a végleges tanító adatba. Bármikor kikapcsolható.</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="consent-toggle" onchange="toggleTrainingConsent()">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+
     <div class="section-lbl">Kitüntetések</div>
     <div class="badge-grid" id="badge-grid"></div>
     <div class="section-lbl">Előzmények</div>

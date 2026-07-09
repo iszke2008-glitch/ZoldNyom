@@ -191,6 +191,18 @@ button{font-family:inherit;}
 .history-row .tx b{display:block; font-size:13px;}
 .history-row .tx span{font-size:11px; color:var(--ink-soft);}
 .history-row .pt{font-size:12.5px; font-weight:800; color:var(--forest);}
+.consent-box{background:var(--white); border:1px solid var(--line); border-radius:18px; padding:14px; margin-bottom:18px;}
+.consent-row{display:flex; align-items:flex-start; gap:12px;}
+.consent-text{flex:1;}
+.consent-text b{display:block; font-size:13.5px; color:var(--ink); margin-bottom:4px;}
+.consent-text span{display:block; font-size:11.5px; color:var(--ink-soft); line-height:1.5;}
+.switch{position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;}
+.switch input{opacity:0; width:0; height:0;}
+.switch-track{position:absolute; cursor:pointer; inset:0; background:var(--line); border-radius:99px; transition:background .2s ease;}
+.switch-track::before{content:''; position:absolute; width:20px; height:20px; left:3px; top:3px; background:var(--white); border-radius:50%; transition:transform .2s ease;}
+.switch input:checked + .switch-track{background:var(--forest);}
+.switch input:checked + .switch-track::before{transform:translateX(18px);}
+
 .danger-btn{background:transparent; color:#B4543A; border:1px solid #E4C3B8; border-radius:16px; padding:12px; font-size:13px; font-weight:700; width:100%; margin-top:18px; cursor:pointer;}
 
 /* ---------- BOTTOM NAV ---------- */
