@@ -6,7 +6,11 @@
 // kategóriákon (részben TACO-adatokból) tanított TF Lite modell.
 // Semmi nem megy ki szerverre — a modell letöltés után teljesen a böngészőben fut.
 const WASTE_MODEL_PATH = './model/waste.tflite';
-const WASTE_CLASS_LABELS = {
+
+// Ez a modell SAJÁT, belső szótára — ezt ő "gondolja", amikor ránéz a képre.
+// Ez NEM egyezik meg az app tényleges kategóriáival (lásd APP_CATEGORIES lejjebb) —
+// egyelőre csak egy tájékoztató "AI-becslés" jelzésként mutatjuk meg a felhasználónak.
+const AI_MODEL_LABELS = {
   0: 'Nyílt szemét',
   1: 'Túltelt szemetes',
   2: 'Műanyag hulladék',
@@ -15,6 +19,22 @@ const WASTE_CLASS_LABELS = {
 };
 // Nincs elfogadási küszöb — mindig a modell legjobb találatát mutatjuk meg,
 // a hozzá tartozó bizonyossági százalékkal együtt (tisztán informatív, nem blokkoló).
+
+// Az app TÉNYLEGES, szabadon szerkeszthető kategóriái — ezt látja és ebből választ
+// a felhasználó, ez kerül elmentésre minden jelentés mellé. Egy jövőbeli saját
+// modell pontosan ezekre a kategóriákra lenne betanítva, mihelyt elég (fotó + emberi
+// címke) pár gyűlik össze belőle.
+const APP_CATEGORIES = [
+  'Cigarettacsikk',
+  'Műanyaghulladék',
+  'Papírhulladék',
+  'Kommunális hulladék',
+  'Szövethulladék',
+  'Elektronikai hulladék',
+  'Elem',
+  'Üveg'
+];
+const NOT_LITTER_OPTION = 'Nem szemét volt';
 
 let wasteDetector = null;
 let wasteDetectorLoading = null;
@@ -64,7 +84,7 @@ async function verifyLitterPhoto(photoDataURL) {
     const raw = [];
     for (let i = 0; i < n; i++) {
       raw.push({
-        class: WASTE_CLASS_LABELS[classes[i]] || ('Kategória ' + classes[i]),
+        class: AI_MODEL_LABELS[classes[i]] || ('Kategória ' + classes[i]),
         confidence: Math.round(scores[i] * 100)
       });
     }
@@ -105,9 +125,11 @@ const BADGE_DEFS = [
   { id: 'streak7',    ic: '📅', name: 'Hétköznapi hős', check: (s) => currentStreak(s) >= 7 },
   { id: 'streak30',   ic: '🛡️', name: 'Erdőőr', check: (s) => currentStreak(s) >= 30 },
   { id: 'ten',        ic: '♻️', name: '10 szemét', check: (s) => s.history.length >= 10 },
-  { id: 'litterpatrol', ic: '🧹', name: 'Tisztasági őrjárat', check: (s) => countByWasteClass(s, 'Nyílt szemét') >= 10 },
-  { id: 'plastichunter', ic: '🧴', name: 'Műanyag-vadász', check: (s) => countByWasteClass(s, 'Műanyag hulladék') >= 20 },
-  { id: 'greenheart', ic: '💚', name: 'Zöld szív', check: (s) => countByWasteClass(s, 'Lebomló hulladék') >= 5 },
+  { id: 'litterpatrol', ic: '🧹', name: 'Tisztasági őrjárat', check: (s) => countByUserLabel(s, 'Kommunális hulladék') >= 10 },
+  { id: 'plastichunter', ic: '🧴', name: 'Műanyag-vadász', check: (s) => countByUserLabel(s, 'Műanyaghulladék') >= 20 },
+  { id: 'buttcollector', ic: '🚬', name: 'Csikk-vadász', check: (s) => countByUserLabel(s, 'Cigarettacsikk') >= 15 },
+  { id: 'batteryrescue', ic: '🔋', name: 'Elem-mentő', check: (s) => countByUserLabel(s, 'Elem') >= 5 },
+  { id: 'glasscollector', ic: '🍾', name: 'Üveg-gyűjtő', check: (s) => countByUserLabel(s, 'Üveg') >= 5 },
   { id: 'earlybird',  ic: '🌅', name: 'Hajnali madár', check: (s) => hasEarlyMorningReport(s) },
   { id: 'pioneer',    ic: '🧭', name: 'Úttörő', check: (s) => distinctLocationCount(s, 150) >= 3 },
   { id: 'tree',       ic: '🌳', name: 'Fiatal fa szint', check: (s) => s.points >= 350 },
@@ -156,8 +178,11 @@ function currentStreak(s) {
   return streak;
 }
 
-function countByWasteClass(s, className) {
-  return s.history.filter(h => h.detection && h.detection.labels && h.detection.labels[0] && h.detection.labels[0].class === className).length;
+// A jelvényekhez a FELHASZNÁLÓ ÁLTAL MEGERŐSÍTETT kategóriát számoljuk (h.userLabel),
+// nem a modell saját, belső becslését — hiszen a valódi kategóriarendszert most már
+// a felhasználó választása adja.
+function countByUserLabel(s, label) {
+  return s.history.filter((h) => h.userLabel === label).length;
 }
 
 function hasEarlyMorningReport(s) {
@@ -278,15 +303,16 @@ function renderDetectChips(container, labels) {
   `).join('');
 }
 
-// A felhasználói visszajelzés-választó (melyik kategória volt valójában) — előre
-// kiválasztva a modell top-1 találata, "Nem szemét volt" opcióval a negatív
-// példák gyűjtéséhez (ezek nélkül a jövőbeli újratanítás torzított lenne).
-const FEEDBACK_OPTIONS = [...Object.values(WASTE_CLASS_LABELS), 'Nem szemét volt'];
+// A felhasználói visszajelzés-választó (melyik kategória volt valójában) — nincs
+// előre kiválasztott alapérték, mert a modell saját belső kategóriái nem egyeznek
+// meg az app kategóriáival. "Nem szemét volt" opció a negatív példák gyűjtéséhez
+// (ezek nélkül egy jövőbeli újratanítás torzított lenne).
+const FEEDBACK_OPTIONS = [...APP_CATEGORIES, NOT_LITTER_OPTION];
 
 function renderFeedbackChips() {
   const container = document.getElementById('feedback-chips');
   container.innerHTML = FEEDBACK_OPTIONS.map((label) => {
-    const isNotLitter = label === 'Nem szemét volt';
+    const isNotLitter = label === NOT_LITTER_OPTION;
     const selected = report.userLabel === label;
     return `<button type="button" class="feedback-chip ${isNotLitter ? 'not-litter' : ''} ${selected ? 'selected' : ''}" data-label="${label}">${label}</button>`;
   }).join('');
@@ -339,11 +365,11 @@ async function capturePhoto() {
   captureBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#F6F2E7" stroke-width="1.8"/></svg> Fotó készítése';
 
   if (result.ok === true) {
-    // Több jelölt is lehet — a top-3-at chip-listaként mutatjuk, informatívan, nem blokkolva vele.
+    // Ez a modell SAJÁT, belső becslése — tájékoztató jellegű, nem az app kategóriái.
     statusEl.className = 'detect-status muted';
-    statusEl.textContent = 'A modell szerint ezek a legvalószínűbb kategóriák:';
+    statusEl.textContent = 'AI-becslés (a modell saját kategóriái):';
     renderDetectChips(listEl, result.labels);
-    report.userLabel = result.labels[0].class; // előre kiválasztjuk a modell tippjét, a felhasználó módosíthatja
+    report.userLabel = null; // a tényleges kategóriát a felhasználó választja lent
   } else if (result.ok === false) {
     statusEl.className = 'detect-status muted';
     statusEl.textContent = 'A modell nem talált egyértelmű kategóriát a képen, de folytathatod.';
@@ -409,12 +435,9 @@ function startGPS() {
 function finishReport() {
   const pts = 25;
   state.points += pts;
-  const detectedLabel = (report.detection && report.detection.ok === true)
-    ? report.detection.labels[0].class
-    : null;
   state.history.unshift({
     id: 'r_' + Date.now(),
-    label: detectedLabel ? ('Szemét — ' + detectedLabel) : 'Szemét — bejelentve',
+    label: report.userLabel ? ('Szemét — ' + report.userLabel) : 'Szemét — bejelentve',
     icon: '🗑️',
     pts,
     photo: report.photoThumb,
