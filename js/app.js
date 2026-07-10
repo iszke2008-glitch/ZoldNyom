@@ -112,11 +112,19 @@ async function verifyLitterPhoto(photoDataURL) {
 const STORAGE_KEY = 'zoldnyom_state_v1';
 
 const STAGES = [
-  { min: 0,   name: 'Mag' },
-  { min: 20,  name: 'Csíra' },
-  { min: 150, name: 'Hajtás' },
-  { min: 350, name: 'Fiatal fa' },
-  { min: 700, name: 'Erdőjáró' }
+  { min: 0,    name: 'Mag' },
+  { min: 25,   name: 'Csíra' },
+  { min: 75,   name: 'Gyököcske' },
+  { min: 150,  name: 'Sziklevél' },
+  { min: 250,  name: 'Magonc' },
+  { min: 400,  name: 'Suháng' },
+  { min: 600,  name: 'Koronás csemete' },
+  { min: 850,  name: 'Fiatal fa' },
+  { min: 1150, name: 'Felnőtt fa' },
+  { min: 1500, name: 'Fa csoport' },
+  { min: 2000, name: 'Liget' },
+  { min: 2600, name: 'Erdő' },
+  { min: 3500, name: 'Őserdő' }
 ];
 
 const BADGE_DEFS = [
@@ -132,8 +140,8 @@ const BADGE_DEFS = [
   { id: 'glasscollector', ic: '🍾', name: 'Üveg-gyűjtő', check: (s) => countByUserLabel(s, 'Üveg') >= 5 },
   { id: 'earlybird',  ic: '🌅', name: 'Hajnali madár', check: (s) => hasEarlyMorningReport(s) },
   { id: 'pioneer',    ic: '🧭', name: 'Úttörő', check: (s) => distinctLocationCount(s, 150) >= 3 },
-  { id: 'tree',       ic: '🌳', name: 'Fiatal fa szint', check: (s) => s.points >= 350 },
-  { id: 'forest',     ic: '🌲', name: 'Erdőjáró szint', check: (s) => s.points >= 700 },
+  { id: 'tree',       ic: '🌳', name: 'Fiatal fa szint', check: (s) => s.points >= 850 },
+  { id: 'forest',     ic: '🌲', name: 'Őserdő szint', check: (s) => s.points >= 3500 },
   { id: 'top3',       ic: '🏆', name: 'Top 3 hetente', check: () => false } // szerver nélkül nem eldönthető, jövőbeli funkció
 ];
 
@@ -533,7 +541,7 @@ function renderHome() {
   }
 }
 
-const STAGE_EMOJI = ['🌱', '🌿', '🌾', '🌳', '🌲'];
+const STAGE_EMOJI = ['🌰', '🌱', '🌿', '🍀', '🪴', '🌾', '🌳', '🌳', '🌲', '🌲', '🌲', '🌲', '🌲'];
 
 function escapeHtml(str) {
   const div = document.createElement('div');
