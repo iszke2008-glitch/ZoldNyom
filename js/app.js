@@ -613,7 +613,7 @@ async function syncLeaderboardEntry() {
 
 const NICKNAME_BLOCKLIST = ['fasz', 'kurva', 'geci', 'buzi', 'picsa'];
 
-function saveNickname() {
+async function saveNickname() {
   const input = document.getElementById('nickname-input');
   const hint = document.getElementById('nickname-hint');
   const value = input.value.trim();
@@ -628,20 +628,62 @@ function saveNickname() {
     hint.className = 'nickname-hint warn';
     return;
   }
-  const lower = value.toLowerCase();
-  if (NICKNAME_BLOCKLIST.some((bad) => lower.includes(bad))) {
+  const normalized = value.toLowerCase();
+  if (NICKNAME_BLOCKLIST.some((bad) => normalized.includes(bad))) {
     hint.textContent = 'Ez a becenév nem használható, válassz másikat.';
     hint.className = 'nickname-hint warn';
     return;
   }
 
-  state.name = value;
-  saveState();
-  hint.textContent = 'Mentve! Mostantól ez a neved a ranglistán.';
-  hint.className = 'nickname-hint ok';
-  renderProfile();
-  renderHome();
-  syncLeaderboardEntry().then(() => renderRank());
+  if (typeof fbDb === 'undefined' || !navigator.onLine) {
+    hint.textContent = 'A becenév egyediségének ellenőrzéséhez internetkapcsolat kell — próbáld újra, ha van net.';
+    hint.className = 'nickname-hint warn';
+    return;
+  }
+
+  hint.textContent = 'Ellenőrzés…';
+  hint.className = 'nickname-hint';
+
+  const oldNormalized = (state.name && state.name !== 'Te') ? state.name.trim().toLowerCase() : null;
+
+  try {
+    await fbReady;
+    const uid = fbAuth.currentUser && fbAuth.currentUser.uid;
+    if (!uid) throw new Error('NO_AUTH');
+
+    if (normalized !== oldNormalized) {
+      // Tranzakció: csak akkor foglaljuk le az új nevet, ha az még nem másé —
+      // ha közben más is épp ugyanezt próbálná, a tranzakció automatikusan újrapróbálkozik/elbukik.
+      await fbDb.runTransaction(async (tx) => {
+        const newRef = fbDb.collection('nicknames').doc(normalized);
+        const newDoc = await tx.get(newRef);
+        if (newDoc.exists && newDoc.data().uid !== uid) {
+          throw new Error('TAKEN');
+        }
+        if (oldNormalized) {
+          tx.delete(fbDb.collection('nicknames').doc(oldNormalized));
+        }
+        tx.set(newRef, { uid, nickname: value });
+      });
+    }
+
+    state.name = value;
+    saveState();
+    hint.textContent = 'Mentve! Mostantól ez a neved a ranglistán.';
+    hint.className = 'nickname-hint ok';
+    renderProfile();
+    renderHome();
+    await syncLeaderboardEntry();
+    renderRank();
+  } catch (e) {
+    if (e && e.message === 'TAKEN') {
+      hint.textContent = 'Ezt a becenevet már valaki más használja — válassz másikat.';
+    } else {
+      hint.textContent = 'Nem sikerült menteni, próbáld újra.';
+      console.warn('Becenév mentése sikertelen:', e);
+    }
+    hint.className = 'nickname-hint warn';
+  }
 }
 
 function renderProfile() {
