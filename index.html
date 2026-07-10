@@ -243,7 +243,7 @@
       <div class="greeting"><div class="eyebrow">Ez heti</div><h2>Ranglista</h2></div>
     </div>
     <div id="rank-list"></div>
-    <div class="rank-note">A ranglista jelenleg csak a te eszközödön él — közösségi ranglistához majd egy szerver kell (2. fázis).</div>
+    <div class="rank-note">A ranglistán csak azok jelennek meg, akik a Profil oldalon beállítottak egy becenevet.</div>
   </div>
 
   <!-- ============ PROFIL ============ -->
@@ -253,6 +253,16 @@
       <h2 id="profile-name">Te</h2>
       <p id="profile-joined">Csatlakozott: —</p>
     </div>
+
+    <div class="nickname-box">
+      <label for="nickname-input">Becenév a ranglistához</label>
+      <div class="nickname-row">
+        <input type="text" id="nickname-input" maxlength="20" placeholder="Add meg a beceneved">
+        <button type="button" class="nickname-save" onclick="saveNickname()">Mentés</button>
+      </div>
+      <div class="nickname-hint" id="nickname-hint">Amíg nincs becenév beállítva, nem jelensz meg a közös ranglistán.</div>
+    </div>
+
     <div class="consent-box">
       <div class="consent-row">
         <div class="consent-text">

@@ -450,6 +450,7 @@ function finishReport() {
   });
   saveState();
   uploadTrainingSample(); // csak akkor csinál bármit, ha a felhasználó hozzájárult
+  syncLeaderboardEntry(); // csak akkor csinál bármit, ha van beállított becenév
   document.getElementById('earned-pts-label').textContent = '+' + pts;
   showPage('page-success');
 }
@@ -532,31 +533,117 @@ function renderHome() {
   }
 }
 
-function renderRank() {
-  // Statikus demó-mezőnyök (MVP-ben nincs szerver, ezért csak illusztráció) + a valódi "Te" sor
-  const others = [
-    { name: 'Balázs K.', stage: 'Erdőjáró', pts: 890, av: '🌳' },
-    { name: 'Zsófi T.', stage: 'Fiatal fa', pts: 610, av: '🌳' },
-    { name: 'Marci P.', stage: 'Hajtás', pts: 340, av: '🌿' },
-    { name: 'Anna D.', stage: 'Hajtás', pts: 205, av: '🌿' },
-    { name: 'Bence R.', stage: 'Csíra', pts: 35, av: '🌱' }
-  ];
-  const me = { name: state.name, stage: STAGES[stageIndex(state.points)].name, pts: state.points, av: '🌱', me: true };
-  const all = [...others, me].sort((a, b) => b.pts - a.pts);
+const STAGE_EMOJI = ['🌱', '🌿', '🌾', '🌳', '🌲'];
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+async function renderRank() {
   const list = document.getElementById('rank-list');
-  list.innerHTML = all.map((p, i) => `
-    <div class="rank-item ${p.me ? 'me' : ''}">
-      <div class="rank-num">${i + 1}</div>
-      <div class="rank-av">${p.av}</div>
-      <div class="rank-name">${p.me ? 'Te' : p.name}<span>${p.stage}</span></div>
-      <div class="rank-pts">${p.pts}</div>
-    </div>
-  `).join('');
+  if (typeof fbDb === 'undefined') {
+    list.innerHTML = '<div class="empty-note">A ranglista jelenleg nem érhető el.</div>';
+    return;
+  }
+  list.innerHTML = '<div class="empty-note">Ranglista betöltése…</div>';
+  try {
+    if (typeof fbReady !== 'undefined') await fbReady;
+    const snap = await fbDb.collection('leaderboard').orderBy('points', 'desc').limit(100).get();
+    const all = [];
+    snap.forEach((doc) => all.push({ uid: doc.id, ...doc.data() }));
+
+    if (!all.length) {
+      list.innerHTML = '<div class="empty-note">Még senki nincs a ranglistán — állíts be egy becenevet a Profil oldalon, és legyél te az első!</div>';
+      return;
+    }
+
+    const myUid = fbAuth.currentUser && fbAuth.currentUser.uid;
+    const top = all.slice(0, 20);
+    const myIndex = all.findIndex((p) => p.uid === myUid);
+    const meInTop = top.some((p) => p.uid === myUid);
+
+    const rowHtml = (p, i) => `
+      <div class="rank-item ${p.uid === myUid ? 'me' : ''}">
+        <div class="rank-num">${i + 1}</div>
+        <div class="rank-av">${STAGE_EMOJI[stageIndex(p.points || 0)]}</div>
+        <div class="rank-name">${p.uid === myUid ? 'Te' : escapeHtml(p.nickname || 'Névtelen')}<span>${STAGES[stageIndex(p.points || 0)].name}</span></div>
+        <div class="rank-pts">${p.points || 0}</div>
+      </div>
+    `;
+
+    let html = top.map(rowHtml).join('');
+    if (!meInTop && myIndex >= 0) {
+      html += rowHtml(all[myIndex], myIndex);
+    }
+    list.innerHTML = html;
+  } catch (e) {
+    console.warn('Ranglista betöltése sikertelen:', e);
+    list.innerHTML = '<div class="empty-note">Nem sikerült betölteni a ranglistát — ellenőrizd az internetkapcsolatot.</div>';
+  }
+}
+
+// A profilod (becenév + pontszám) szinkronizálása a közös ranglistába.
+// Csak akkor ír bármit, ha már van beállított becenév — enélkül nem kerülsz be a listára.
+async function syncLeaderboardEntry() {
+  if (!state.name || state.name === 'Te') return;
+  if (typeof fbDb === 'undefined' || !navigator.onLine) return;
+  try {
+    if (typeof fbReady !== 'undefined') await fbReady;
+    const uid = fbAuth.currentUser && fbAuth.currentUser.uid;
+    if (!uid) return;
+    await fbDb.collection('leaderboard').doc(uid).set({
+      nickname: state.name,
+      points: state.points,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.warn('Ranglista-szinkron sikertelen (nem blokkoló):', e);
+  }
+}
+
+const NICKNAME_BLOCKLIST = ['fasz', 'kurva', 'geci', 'buzi', 'picsa'];
+
+function saveNickname() {
+  const input = document.getElementById('nickname-input');
+  const hint = document.getElementById('nickname-hint');
+  const value = input.value.trim();
+
+  if (value.length < 2 || value.length > 20) {
+    hint.textContent = 'A becenév 2 és 20 karakter között legyen.';
+    hint.className = 'nickname-hint warn';
+    return;
+  }
+  if (!/^[\p{L}0-9 _-]+$/u.test(value)) {
+    hint.textContent = 'Csak betűket, számokat, szóközt és - _ jeleket használj.';
+    hint.className = 'nickname-hint warn';
+    return;
+  }
+  const lower = value.toLowerCase();
+  if (NICKNAME_BLOCKLIST.some((bad) => lower.includes(bad))) {
+    hint.textContent = 'Ez a becenév nem használható, válassz másikat.';
+    hint.className = 'nickname-hint warn';
+    return;
+  }
+
+  state.name = value;
+  saveState();
+  hint.textContent = 'Mentve! Mostantól ez a neved a ranglistán.';
+  hint.className = 'nickname-hint ok';
+  renderProfile();
+  renderHome();
+  syncLeaderboardEntry().then(() => renderRank());
 }
 
 function renderProfile() {
   document.getElementById('profile-joined').textContent =
     'Csatlakozott: ' + new Date(state.joined).toLocaleDateString('hu-HU', { year: 'numeric', month: 'long' });
+
+  const nicknameInput = document.getElementById('nickname-input');
+  if (nicknameInput && document.activeElement !== nicknameInput) {
+    nicknameInput.value = (state.name && state.name !== 'Te') ? state.name : '';
+  }
 
   const consentToggle = document.getElementById('consent-toggle');
   if (consentToggle) consentToggle.checked = !!state.trainingConsent;
