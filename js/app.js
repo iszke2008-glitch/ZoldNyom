@@ -32,7 +32,8 @@ const APP_CATEGORIES = [
   'Szövethulladék',
   'Elektronikai hulladék',
   'Elem',
-  'Üveg'
+  'Üveg',
+  'Fém hulladék'
 ];
 const NOT_LITTER_OPTION = 'Nem szemét volt';
 
@@ -138,6 +139,7 @@ const BADGE_DEFS = [
   { id: 'buttcollector', ic: '🚬', name: 'Csikk-vadász', check: (s) => countByUserLabel(s, 'Cigarettacsikk') >= 15 },
   { id: 'batteryrescue', ic: '🔋', name: 'Elem-mentő', check: (s) => countByUserLabel(s, 'Elem') >= 5 },
   { id: 'glasscollector', ic: '🍾', name: 'Üveg-gyűjtő', check: (s) => countByUserLabel(s, 'Üveg') >= 5 },
+  { id: 'metalcollector', ic: '🔩', name: 'Fém-gyűjtő', check: (s) => countByUserLabel(s, 'Fém hulladék') >= 10 },
   { id: 'earlybird',  ic: '🌅', name: 'Hajnali madár', check: (s) => hasEarlyMorningReport(s) },
   { id: 'pioneer',    ic: '🧭', name: 'Úttörő', check: (s) => distinctLocationCount(s, 150) >= 3 },
   { id: 'tree',       ic: '🌳', name: 'Fiatal fa szint', check: (s) => s.points >= 850 },
@@ -708,19 +710,74 @@ function renderProfile() {
   if (!state.history.length) {
     hist.innerHTML = '<div class="empty-note">Az előzményeid itt fognak megjelenni.</div>';
   } else {
-    hist.innerHTML = state.history.map(h => `
+    hist.innerHTML = renderHistoryGroups(state.history);
+  }
+}
+
+// Naponkénti csoportosítás — alapból csak a legfrissebb nap van nyitva, a többi
+// egy sornyi összegzésként (dátum + darabszám + pont) jelenik meg, koppintásra nyílik ki.
+let expandedHistoryDays = null; // null = "még nincs explicit állítva", ilyenkor a legfrissebb nap nyíljon
+
+function renderHistoryGroups(history) {
+  const groups = [];
+  const byKey = new Map();
+  history.forEach((h) => {
+    const d = new Date(h.ts);
+    const key = d.toDateString();
+    if (!byKey.has(key)) {
+      const group = { key, date: d, items: [] };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    byKey.get(key).items.push(h);
+  });
+
+  if (expandedHistoryDays === null) {
+    expandedHistoryDays = new Set(groups.length ? [groups[0].key] : []);
+  }
+
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+  return groups.map((g) => {
+    const isOpen = expandedHistoryDays.has(g.key);
+    const totalPts = g.items.reduce((sum, h) => sum + h.pts, 0);
+    let dateLabel;
+    if (g.key === today) dateLabel = 'Ma';
+    else if (g.key === yesterday) dateLabel = 'Tegnap';
+    else dateLabel = g.date.toLocaleDateString('hu-HU', { month: 'long', day: 'numeric' });
+
+    const rows = g.items.map((h) => `
       <div class="history-row">
         <div class="ic">${h.photo ? `<img src="${h.photo}" alt="">` : h.icon}</div>
-        <div class="tx"><b>${h.label}</b><span>${new Date(h.ts).toLocaleString('hu-HU')}</span></div>
+        <div class="tx"><b>${h.label}</b><span>${new Date(h.ts).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' })}</span></div>
         <div class="pt">+${h.pts}</div>
       </div>
     `).join('');
-  }
+
+    return `
+      <div class="history-day">
+        <button type="button" class="history-day-head" onclick="toggleHistoryDay('${g.key}')">
+          <span class="hd-date">${dateLabel}</span>
+          <span class="hd-summary">${g.items.length} db · +${totalPts} pont</span>
+          <span class="hd-chevron ${isOpen ? 'open' : ''}">▾</span>
+        </button>
+        <div class="history-day-body ${isOpen ? 'open' : ''}"><div class="hdb-inner">${rows}</div></div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleHistoryDay(key) {
+  if (expandedHistoryDays.has(key)) expandedHistoryDays.delete(key);
+  else expandedHistoryDays.add(key);
+  renderProfile();
 }
 
 function resetData() {
   if (confirm('Biztosan törlöd az összes helyi adatot (pontok, előzmények)? Ez nem vonható vissza.')) {
     state = defaultState();
+    expandedHistoryDays = null;
     saveState();
     renderHome(); renderProfile(); renderRank();
     goHome();
